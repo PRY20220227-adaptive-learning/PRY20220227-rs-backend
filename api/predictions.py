@@ -1,5 +1,6 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException
+import numpy as np
 from database.connection import Database
 from models.recommendation import Recommendations
 from schemas.input_data import InputData
@@ -45,6 +46,7 @@ n_categories = len(category_codes)
 @router.post('/predict/student/{id}')
 def predict_resources(input_data: InputData, id: int, db: Session = Depends(database.get_db_session)):
 
+    # Asegurar que mark es float
     if not isinstance(input_data.mark, float):
         input_data.mark = float(input_data.mark)
 
@@ -59,42 +61,52 @@ def predict_resources(input_data: InputData, id: int, db: Session = Depends(data
     # Convertir las variables categóricas a numéricas usando one-hot encoding
     df = pd.get_dummies(df, columns=['knowledge_level', 'learning_style'])
 
-    # Agregar columnas para los otros valores posibles de knowledge_level
+    # Agregar columnas para los otros valores posibles de knowledge_level y  learning_style
     for col in [f'knowledge_level_{level}' for level in ['Avanzado', 'Intermedio', 'Principiante']]:
         if col not in df.columns:
             df[col] = 0
 
-    # Agregar columnas para los otros valores posibles de learning_style
     for col in [f'learning_style_{style}' for style in ['Auditivo', 'Kinestésico', 'Read/Write', 'Visual']]:
         if col not in df.columns:
             df[col] = 0
 
-    # Convertir la columna "subject" a su valor ordinal correspondiente
-    df['subject'] = df['subject'].map(category_codes).fillna(-1)
-
-    print("sub", df)
-
+    # Reaordenar las columnas del dataframe para que coincida con el modelo
     df = df.reindex(columns=['mark', 'subject', 'knowledge_level_Avanzado', 'knowledge_level_Intermedio', 'knowledge_level_Principiante',
                     'learning_style_Auditivo', 'learning_style_Kinestésico', 'learning_style_Read/Write', 'learning_style_Visual'])
 
-    print("prd", df)
-
     # Hacer la predicción
-    prediction = model.predict(df)
+    probabilities = model.predict_proba(df)
 
-    # crear una instancia de Recommendations
-    recommendation = Recommendations(
-        date=datetime.now().date(),
-        url=prediction[0],
-        topic=input_data.subject,
-        student_id=id,
-    )
+    # Obtener las etiquetas correspondientes a las probabilidades más altas
+    labels = [model.classes_[
+        i] if i is not None else None for i in np.argsort(-probabilities[0])[:4]]
 
-    db.add(recommendation)
+    # Convertir las etiquetas predichas en URLs
+    urls = [label for label in labels]
+
+    # Convertir el diccionario en una lista de tuplas para hallar el nombre del tema
+    category_codes_list = list(category_codes.items())
+
+    subject = None
+    for category, code in category_codes_list:
+        if code == int(input_data.subject):
+            subject = category
+            break
+
+    # Almacenar cada URL en la base de datos
+    for url in urls:
+        recommendation = Recommendations(
+            date=datetime.now().date(),
+            url=url,
+            topic=subject,
+            student_id=id,
+        )
+        db.add(recommendation)
+
     db.commit()
 
-    # Devolver la predicción
-    return prediction[0]
+    # Devolver las URLs predichas
+    return urls
 
 
 @router.get('/history/user/{id}', response_model=List[RecommendationResponse])
