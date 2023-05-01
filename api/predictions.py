@@ -20,22 +20,22 @@ model = joblib.load('random_forest_model.joblib')
 
 # Definir diccionario de correspondencias
 category_codes = {
-    'A few/A little': 9,
-    'Be going to': 2,
-    'Can/Can\'t': 6,
-    'Comparative adjectives': 5,
-    'Comparative/Superlative': 10,
-    'Could/Couldn\'t': 7,
-    'Modal verbs': 11,
-    'Past simple': 13,
-    'Present continuous': 1,
-    'Present simple': 0,
-    'Quantifiers': 12,
-    'Shall': 3,
-    'Should/Shouldn\'t': 14,
-    'Superlatives adjectives': 8,
-    'Too/Enough': 15,
-    'Verb to be': 4,
+    'A few/A little': 0,
+    'Be going to': 1,
+    'Can/Can\'t': 2,
+    'Comparative adjectives': 3,
+    'Comparative/Superlative': 4,
+    'Could/Couldn\'t': 5,
+    'Modal verbs': 6,
+    'Past simple': 7,
+    'Present continuous': 8,
+    'Present simple': 9,
+    'Quantifiers': 10,
+    'Shall': 11,
+    'Should/Shouldn\'t': 12,
+    'Superlatives adjectives': 13,
+    'Too/Enough': 14,
+    'Verb to be': 15,
     'Want/Need/Would': 16
 }
 
