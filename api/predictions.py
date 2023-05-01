@@ -46,36 +46,43 @@ n_categories = len(category_codes)
 @router.post('/predict/student/{id}')
 def predict_resources(input_data: InputData, id: int, db: Session = Depends(database.get_db_session)):
 
-    df = create_data_frame(input_data)
+    # Definir umbral de probabilidad
+    umbral_probabilidad = 0.15
 
-    # Hacer la predicción
-    probabilities = model.predict_proba(df)
+    # Realizar las cuatro consultas al modelo con los valores de mark variados
+    probabilidades1 = model.predict_proba(
+        create_data_frame(input_data.mark + 2, input_data.knowledge_level, input_data.learning_style, input_data.subject))[0]
+    probabilidades2 = model.predict_proba(
+        create_data_frame(input_data.mark + 1, input_data.knowledge_level, input_data.learning_style, input_data.subject))[0]
+    probabilidades3 = model.predict_proba(
+        create_data_frame(input_data.mark - 1, input_data.knowledge_level, input_data.learning_style, input_data.subject))[0]
+    probabilidades4 = model.predict_proba(
+        create_data_frame(input_data.mark - 2, input_data.knowledge_level, input_data.learning_style, input_data. subject))[0]
 
-    # Obtener las etiquetas correspondientes a las probabilidades más altas
-    labels = [model.classes_[
-        i] if i is not None else None for i in np.argsort(-probabilities[0])[:4]]
+    # Combinar las probabilidades de las cuatro consultas
+    probabilidades = (probabilidades1 + probabilidades2 +
+                      probabilidades3 + probabilidades4) / 4
 
-    # Convertir las etiquetas predichas en URLs
-    urls = [label for label in labels]
+    # Seleccionar las clases con una probabilidad mayor que el umbral
+    seleccionadas = np.where(probabilidades > umbral_probabilidad)[0]
+    etiquetas_seleccionadas = model.classes_[seleccionadas].tolist()
 
-    save_recommendations(urls, id, input_data.subject, db)
-
-    # Devolver las URLs predichas
-    return urls
+    # Devolver las etiquetas seleccionadas
+    return etiquetas_seleccionadas
 
 
-def create_data_frame(input_data: InputData):
+def create_data_frame(mark: float, knowledge_level: str, learning_style: str, subject: str):
 
     # Asegurar que mark es float
-    if not isinstance(input_data.mark, float):
-        input_data.mark = float(input_data.mark)
+    if not isinstance(mark, float):
+        mark = float(mark)
 
     # Preprocesar los datos de entrada
     df = pd.DataFrame({
-        'mark': [input_data.mark],
-        'knowledge_level': [input_data.knowledge_level],
-        'learning_style': [input_data.learning_style],
-        'subject': [input_data.subject]
+        'mark': [mark],
+        'knowledge_level': [knowledge_level],
+        'learning_style': [learning_style],
+        'subject': [subject]
     })
 
     # Convertir las variables categóricas a numéricas usando one-hot encoding
