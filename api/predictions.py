@@ -67,6 +67,9 @@ def predict_resources(input_data: InputData, id: int, db: Session = Depends(data
     seleccionadas = np.where(probabilidades > umbral_probabilidad)[0]
     etiquetas_seleccionadas = model.classes_[seleccionadas].tolist()
 
+    # Guardar las recomendaciones
+    save_recommendations(etiquetas_seleccionadas, id, input_data.subject, db)
+
     # Devolver las etiquetas seleccionadas
     return etiquetas_seleccionadas
 
