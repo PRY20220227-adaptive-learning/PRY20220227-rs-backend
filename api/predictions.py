@@ -20,23 +20,23 @@ model = joblib.load('random_forest_model.joblib')
 
 # Definir diccionario de correspondencias
 category_codes = {
-    'A few/A little': 0,
-    'Be going to': 1,
-    'Can/Can\'t': 2,
-    'Comparative adjectives': 3,
-    'Comparative/Superlative': 4,
-    'Could/Couldn\'t': 5,
-    'Modal verbs': 6,
-    'Past simple': 7,
-    'Present continuous': 8,
-    'Present simple': 9,
-    'Quantifiers': 10,
-    'Shall': 11,
-    'Should/Shouldn\'t': 12,
-    'Superlatives adjectives': 13,
-    'Too/Enough': 14,
-    'Verb to be': 15,
-    'Want/Need/Would': 16
+    'A few/A little': '0',
+    'Be going to': '1',
+    'Can/Can\'t': '2',
+    'Comparative adjectives': '3',
+    'Comparative/Superlative': '4',
+    'Could/Couldn\'t': '5',
+    'Modal verbs': '6',
+    'Past simple': '7',
+    'Present continuous': '8',
+    'Present simple': '9',
+    'Quantifiers': '10',
+    'Shall': '11',
+    'Should/Shouldn\'t': '12',
+    'Superlatives adjectives': '13',
+    'Too/Enough': '14',
+    'Verb to be': '15',
+    'Want/Need/Would': '16'
 }
 
 # Definir el número total de categorías en el modelo
@@ -45,6 +45,26 @@ n_categories = len(category_codes)
 
 @router.post('/predict/student/{id}')
 def predict_resources(input_data: InputData, id: int, db: Session = Depends(database.get_db_session)):
+
+    df = create_data_frame(input_data)
+
+    # Hacer la predicción
+    probabilities = model.predict_proba(df)
+
+    # Obtener las etiquetas correspondientes a las probabilidades más altas
+    labels = [model.classes_[
+        i] if i is not None else None for i in np.argsort(-probabilities[0])[:4]]
+
+    # Convertir las etiquetas predichas en URLs
+    urls = [label for label in labels]
+
+    save_recommendations(urls, id, input_data.subject, db)
+
+    # Devolver las URLs predichas
+    return urls
+
+
+def create_data_frame(input_data: InputData):
 
     # Asegurar que mark es float
     if not isinstance(input_data.mark, float):
@@ -73,25 +93,23 @@ def predict_resources(input_data: InputData, id: int, db: Session = Depends(data
     # Reaordenar las columnas del dataframe para que coincida con el modelo
     df = df.reindex(columns=['mark', 'subject', 'knowledge_level_Avanzado', 'knowledge_level_Intermedio', 'knowledge_level_Principiante',
                     'learning_style_Auditivo', 'learning_style_Kinestésico', 'learning_style_Read/Write', 'learning_style_Visual'])
+    return df
 
-    # Hacer la predicción
-    probabilities = model.predict_proba(df)
 
-    # Obtener las etiquetas correspondientes a las probabilidades más altas
-    labels = [model.classes_[
-        i] if i is not None else None for i in np.argsort(-probabilities[0])[:4]]
-
-    # Convertir las etiquetas predichas en URLs
-    urls = [label for label in labels]
+def save_recommendations(urls: list, id: int, subject: str, db: Session):
 
     # Convertir el diccionario en una lista de tuplas para hallar el nombre del tema
     category_codes_list = list(category_codes.items())
 
-    subject = None
+    # Encontrar el nombre del tema correspondiente al código recibido
     for category, code in category_codes_list:
-        if code == int(input_data.subject):
+        if code == subject:
             subject = category
             break
+
+    # Verificar que el tema no sea nulo
+    if subject is None:
+        raise ValueError("El código del tema no es válido")
 
     # Almacenar cada URL en la base de datos
     for url in urls:
@@ -104,9 +122,7 @@ def predict_resources(input_data: InputData, id: int, db: Session = Depends(data
         db.add(recommendation)
 
     db.commit()
-
-    # Devolver las URLs predichas
-    return urls
+    return
 
 
 @router.get('/history/user/{id}', response_model=List[RecommendationResponse])
