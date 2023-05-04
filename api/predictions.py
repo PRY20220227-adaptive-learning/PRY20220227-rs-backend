@@ -138,7 +138,7 @@ def save_recommendations(urls: list, id: int, subject: str, db: Session):
 @router.get('/history/user/{id}', response_model=List[RecommendationResponse])
 def get_resources_by_user_id(id: int, db: Session = Depends(database.get_db_session)):
     recommendations = db.query(Recommendations).filter(
-        Recommendations.student_id == id).all()
+        Recommendations.student_id == id).order_by(Recommendations.date.desc()).all()
     if not recommendations:
         raise HTTPException(
             status_code=404, detail=f"No se encontraron recomendaciones para el estudiante con id {id}")
